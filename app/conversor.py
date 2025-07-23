@@ -5,12 +5,25 @@ import os
 from datetime import datetime
 
 class ConversorMapasFrame(ctk.CTkFrame):
-    def __init__(self, master):
+    def __init__(self, master, app=None):
         super().__init__(master)
+        self.app = app
         self.arquivo_inex = None
+
         self.progress = None
         self.status = None
         self._build()
+
+        # Inicializar com os caminhos do app, se já selecionados
+        if self.app:
+            if self.app.arquivo_mapa:
+                self.atualizar_arquivo_mapa(self.app.arquivo_mapa)
+            if self.app.pasta_destino:
+                self.pasta_destino = self.app.pasta_destino
+            else:
+                self.pasta_destino = os.path.join(os.path.expanduser("~"), "Downloads")
+        else:
+            self.pasta_destino = os.path.join(os.path.expanduser("~"), "Downloads")
 
     def _build(self):
         ctk.CTkLabel(self, text="Conversor de Execução Orçamentária", font=("Arial", 22, "bold")).pack(pady=20)
@@ -19,8 +32,7 @@ class ConversorMapasFrame(ctk.CTkFrame):
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(pady=10)
 
-        ctk.CTkButton(btn_frame, text="📂 Anexar Mapa", command=self.selecionar_arquivo, width=180, height=45).pack(side="left", padx=10)
-        ctk.CTkButton(btn_frame, text="📁 Selecionar Pasta", command=self.selecionar_pasta, width=180, height=45).pack(side="left", padx=10)
+        # Removido botões de anexar e selecionar pasta daqui para ser universal no menu lateral
         ctk.CTkButton(btn_frame, text="📥 Incluir INEX (Opcional)", command=self.popup_incluir_inex, width=180, height=45).pack(side="left", padx=10)
         ctk.CTkButton(btn_frame, text="📤 Converter", command=self.converter, width=180, height=45).pack(side="left", padx=10)
 
@@ -32,19 +44,13 @@ class ConversorMapasFrame(ctk.CTkFrame):
         self.status.pack(pady=20)
 
         self.arquivo_mapa = None
-        self.pasta_destino = os.path.join(os.path.expanduser("~"), "Downloads")
 
-    def selecionar_arquivo(self):
-        path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx *.xls")])
-        if path:
-            self.arquivo_mapa = path
-            self.status.configure(text=f"📄 Arquivo selecionado: {os.path.basename(path)}", text_color="#1E3A8A")
+    def atualizar_arquivo_mapa(self, path):
+        self.arquivo_mapa = path
+        self.status.configure(text=f"📄 Arquivo selecionado: {os.path.basename(path)}", text_color="#1E3A8A")
 
-    def selecionar_pasta(self):
-        folder = filedialog.askdirectory()
-        if folder:
-            self.pasta_destino = folder
-            self.status.configure(text=f"📁 Pasta selecionada: {folder}", text_color="#1E3A8A")
+    def atualizar_pasta_destino(self, path):
+        self.pasta_destino = path
 
     def popup_incluir_inex(self):
         popup = ctk.CTkToplevel(self)
@@ -92,7 +98,6 @@ class ConversorMapasFrame(ctk.CTkFrame):
         self.update()
 
         try:
-            import pandas as pd
             mapa_df = pd.read_excel(self.arquivo_mapa, dtype={"CNPJ": str, "CPF": str, "Fatura": str})
             mapa_df["CNPJ"] = mapa_df["CNPJ"].replace([None, "nan", "0", "0.0", "", " "], pd.NA)
             mapa_df["Identificador"] = mapa_df["CNPJ"].fillna(mapa_df["CPF"])

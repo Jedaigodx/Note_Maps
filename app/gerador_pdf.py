@@ -57,19 +57,17 @@ class PDFTabela(FPDF):
 
 
 class GeradorPDFFaturaFrame(ctk.CTkFrame):
-    def __init__(self, master):
+    def __init__(self, master, app=None):
         super().__init__(master)
+        self.app = app  # Referência para o app principal para acessar arquivo e pasta
 
         # Variáveis para dados
         self.df = None
         self.faturas_unicas = []
         self.selected_faturas = []
-        
+
         # Monta interface
         self._build_ui()
-
-        # Carrega arquivo Excel automaticamente (se quiser, pode mudar para botão)
-        self.carregar_excel()
 
     def _build_ui(self):
         ctk.CTkLabel(self, text="Gerador de PDF por Fatura", font=("Arial", 22, "bold")).pack(pady=20)
@@ -93,14 +91,24 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
         self.status.pack()
 
     def carregar_excel(self):
-        # Usar filedialog para selecionar o arquivo (ou manter fixo se quiser)
-        caminho_excel = filedialog.askopenfilename(title="Selecione o arquivo Excel", filetypes=[("Excel files", "*.xlsx *.xls")])
+        # Se o app principal tiver arquivo_mapa definido, usar ele, senão pedir arquivo
+        if self.app and self.app.arquivo_mapa:
+            caminho_excel = self.app.arquivo_mapa
+        else:
+            caminho_excel = filedialog.askopenfilename(title="Selecione o arquivo Excel", filetypes=[("Excel files", "*.xlsx *.xls")])
+            if self.app:
+                self.app.arquivo_mapa = caminho_excel
+
         if not caminho_excel:
             self.status.configure(text="Arquivo Excel não selecionado.", text_color="red")
             return
 
-        self.df = pd.read_excel(caminho_excel, sheet_name="Sheet1")
-        self.faturas_unicas = sorted(self.df['Fatura'].dropna().unique())
+        try:
+            self.df = pd.read_excel(caminho_excel, sheet_name="Sheet1")
+            self.faturas_unicas = sorted(self.df['Fatura'].dropna().unique())
+        except Exception as e:
+            self.status.configure(text=f"Erro ao ler arquivo: {str(e)}", text_color="red")
+            return
 
         # Limpa checkboxes antigos
         for _, cb in self.checkboxes:
@@ -132,6 +140,10 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
         self.gerar_btn.configure(state='normal')
 
     def gerar_pdf(self):
+        if self.df is None:
+            self.status.configure(text="Nenhum arquivo Excel carregado.", text_color="red")
+            return
+
         plano = self.plano_combo.get()
         if not plano:
             self.status.configure(text="Selecione um Plano Interno válido.", text_color="red")
@@ -154,7 +166,27 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
         pdf.add_page()
         pdf.tabela(dados_filtrados, colunas_exibir)
 
+        # Usa a pasta destino se tiver, senão salva na pasta atual
+        pasta_destino = self.app.pasta_destino if (self.app and self.app.pasta_destino) else None
         nome_arquivo = f"Fatura_{'_'.join(map(str, map(int, self.selected_faturas)))}_{plano}.pdf"
-        pdf.output(nome_arquivo)
+        caminho_arquivo = nome_arquivo
+        if pasta_destino:
+            import os
+            caminho_arquivo = os.path.join(pasta_destino, nome_arquivo)
 
-        self.status.configure(text=f"✅ PDF gerado: {nome_arquivo}", text_color="green")
+        try:
+            pdf.output(caminho_arquivo)
+            self.status.configure(text=f"✅ PDF gerado: {caminho_arquivo}", text_color="green")
+        except Exception as e:
+            self.status.configure(text=f"Erro ao salvar PDF: {str(e)}", text_color="red")
+
+    # Atualizar quando o app define novo arquivo mapa
+    def atualizar_arquivo_mapa(self, caminho):
+        self.app.arquivo_mapa = caminho
+        self.status.configure(text=f"Arquivo mapa anexado: {caminho}", text_color="green")
+        self.carregar_excel()
+
+    # Atualizar quando o app define nova pasta destino
+    def atualizar_pasta_destino(self, caminho):
+        self.app.pasta_destino = caminho
+        self.status.configure(text=f"Pasta destino definida: {caminho}", text_color="green")
