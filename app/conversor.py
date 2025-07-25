@@ -30,7 +30,7 @@ class ConversorMapasFrame(ctk.CTkFrame):
         self.btn_anexar_inex = ctk.CTkButton(btn_frame, text="📎 Anexar INEX (opcional)", command=self.anexar_inex, width=180, height=45)
         self.btn_anexar_inex.pack(side="left", padx=10)
 
-        self.btn_converter = ctk.CTkButton(btn_frame, text="📤 Converter", command=self.converter, width=180, height=45)
+        self.btn_converter = ctk.CTkButton(btn_frame, text="📤 Gerar extrato", command=self.converter, width=180, height=45)
         self.btn_converter.pack(side="left", padx=10)
 
         self.progress = ctk.CTkProgressBar(self, mode="indeterminate")

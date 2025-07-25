@@ -4,7 +4,7 @@ import os
 from conversor import ConversorMapasFrame
 from gerador_pdf import GeradorPDFFaturaFrame
 
-# Cores padrão como constantes
+# Cores 
 BTN_FG = "#04573B"
 BTN_HOVER = "#093828"
 SIDEBAR_BG = "#0F172A"
@@ -66,7 +66,6 @@ class App(ctk.CTk):
         self.geometry("950x650")
         self.resizable(True, True)
 
-        # Variáveis compartilhadas
         self.arquivo_mapa = None
         self.pasta_destino = None
 
@@ -85,12 +84,12 @@ class App(ctk.CTk):
                      font=("Arial",16, "bold"),
                      height=30).pack(fill="x", pady=(10,20), padx=15)
 
-        ctk.CTkButton(self.sidebar, text="🧾 Conversor de Notas", 
+        ctk.CTkButton(self.sidebar, text="🧾 Gerar Extrato NF", 
                      command=self.show_conversor,
                      fg_color=SIDEBAR_BTN_ACTIVE,
                      hover_color=SIDEBAR_BTN_HOVER,
                      font=("Arial",14, "bold"),
-                     height=30).pack(fill="x", pady=(5,7), padx=15)
+                     height=30,anchor="w").pack(fill="x", pady=(5,7), padx=15)
 
         ctk.CTkButton(self.sidebar, text="📄 Gerar Relatório", 
                      command=self.show_pdf,
@@ -100,16 +99,13 @@ class App(ctk.CTk):
                      height=30, 
                      anchor="w").pack(fill="x", pady=(5,10), padx=15)
 
-        # Status label sidebar
         self.status_label = ctk.CTkLabel(self.sidebar, text="Nenhum arquivo anexado", font=("Arial", 10), text_color="gray")
         self.status_label.pack(side="bottom", pady=10, padx=10)
-
-        # Instanciar frames sob demanda (lazy load)
+        
         self.frames = {}
         self.current_frame = None
         self.show_inicio()
 
-        # Atalhos
         self.bind_all("<Control-1>", lambda e: self.show_inicio())
         self.bind_all("<Control-2>", lambda e: self.show_conversor())
         self.bind_all("<Control-3>", lambda e: self.show_pdf())
