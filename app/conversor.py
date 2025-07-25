@@ -9,32 +9,29 @@ class ConversorMapasFrame(ctk.CTkFrame):
         super().__init__(master)
         self.app = app
         self.arquivo_inex = None
+        self.pasta_destino = None
 
-        self.progress = None
-        self.status = None
-        self._build()
+        self._build_ui()
 
         # Inicializar com os caminhos do app, se já selecionados
         if self.app:
             if self.app.arquivo_mapa:
                 self.atualizar_arquivo_mapa(self.app.arquivo_mapa)
             if self.app.pasta_destino:
-                self.pasta_destino = self.app.pasta_destino
-            else:
-                self.pasta_destino = os.path.join(os.path.expanduser("~"), "Downloads")
-        else:
-            self.pasta_destino = os.path.join(os.path.expanduser("~"), "Downloads")
+                self.atualizar_pasta_destino(self.app.pasta_destino)
 
-    def _build(self):
+    def _build_ui(self):
         ctk.CTkLabel(self, text="Conversor de Execução Orçamentária", font=("Arial", 22, "bold")).pack(pady=20)
         ctk.CTkFrame(self, height=2, fg_color="gray").pack(fill="x", padx=30, pady=(0, 20))
 
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(pady=10)
 
-        # Removido botões de anexar e selecionar pasta daqui para ser universal no menu lateral
-        ctk.CTkButton(btn_frame, text="📥 Incluir INEX (Opcional)", command=self.popup_incluir_inex, width=180, height=45).pack(side="left", padx=10)
-        ctk.CTkButton(btn_frame, text="📤 Converter", command=self.converter, width=180, height=45).pack(side="left", padx=10)
+        self.btn_anexar_inex = ctk.CTkButton(btn_frame, text="📎 Anexar INEX (opcional)", command=self.anexar_inex, width=180, height=45)
+        self.btn_anexar_inex.pack(side="left", padx=10)
+
+        self.btn_converter = ctk.CTkButton(btn_frame, text="📤 Converter", command=self.converter, width=180, height=45)
+        self.btn_converter.pack(side="left", padx=10)
 
         self.progress = ctk.CTkProgressBar(self, mode="indeterminate")
         self.progress.pack(fill="x", padx=30, pady=10)
@@ -52,28 +49,11 @@ class ConversorMapasFrame(ctk.CTkFrame):
     def atualizar_pasta_destino(self, path):
         self.pasta_destino = path
 
-    def popup_incluir_inex(self):
-        popup = ctk.CTkToplevel(self)
-        popup.title("Incluir INEX?")
-        popup.geometry("350x150")
-        popup.grab_set()
-
-        ctk.CTkLabel(popup, text="Deseja incluir o arquivo INEX?", font=("Arial", 14)).pack(pady=20)
-
-        def incluir():
-            popup.destroy()
-            path = filedialog.askopenfilename(title="Selecione o arquivo INEX", filetypes=[("Excel Files", "*.xlsx *.xls")])
-            if path:
-                self.arquivo_inex = path
-                self.status.configure(text=f"📄 Arquivo INEX selecionado: {os.path.basename(path)}", text_color="#1E3A8A")
-
-        def nao_incluir():
-            popup.destroy()
-
-        btn_frame = ctk.CTkFrame(popup, fg_color="transparent")
-        btn_frame.pack(pady=10)
-        ctk.CTkButton(btn_frame, text="✅ Sim", command=incluir, width=100).pack(side="left", padx=10)
-        ctk.CTkButton(btn_frame, text="❌ Não", command=nao_incluir, width=100).pack(side="right", padx=10)
+    def anexar_inex(self):
+        path = filedialog.askopenfilename(title="Selecione o arquivo INEX", filetypes=[("Excel Files", "*.xlsx *.xls")])
+        if path:
+            self.arquivo_inex = path
+            self.status.configure(text=f"📄 INEX anexado: {os.path.basename(path)}", text_color="#1E3A8A")
 
     def formatar_identificador(self, val):
         try:
@@ -92,6 +72,11 @@ class ConversorMapasFrame(ctk.CTkFrame):
         if not self.arquivo_mapa:
             self.status.configure(text="❌ Por favor, selecione o arquivo mapa.", text_color="red")
             return
+        if not self.pasta_destino:
+            self.status.configure(text="❌ Por favor, selecione a pasta destino para salvar o arquivo.", text_color="red")
+            return
+
+        self.btn_converter.configure(state="disabled")
         self.progress.pack(fill="x", padx=30, pady=10)
         self.progress.start()
         self.status.configure(text="Processando...", text_color="#1E3A8A")
@@ -99,6 +84,12 @@ class ConversorMapasFrame(ctk.CTkFrame):
 
         try:
             mapa_df = pd.read_excel(self.arquivo_mapa, dtype={"CNPJ": str, "CPF": str, "Fatura": str})
+            # Verificar colunas obrigatórias
+            obrigatorias = ['CNPJ', 'CPF', 'Fatura', 'Plano Interno', 'Nome', 'Valor']
+            faltando = [col for col in obrigatorias if col not in mapa_df.columns]
+            if faltando:
+                raise ValueError(f"Colunas faltando: {', '.join(faltando)}")
+
             mapa_df["CNPJ"] = mapa_df["CNPJ"].replace([None, "nan", "0", "0.0", "", " "], pd.NA)
             mapa_df["Identificador"] = mapa_df["CNPJ"].fillna(mapa_df["CPF"])
 
@@ -121,7 +112,11 @@ class ConversorMapasFrame(ctk.CTkFrame):
             if self.arquivo_inex:
                 inex_df = pd.read_excel(self.arquivo_inex, dtype={"CNPJ": str})
                 inex_df["CNPJ"] = inex_df["CNPJ"].astype(str).str.zfill(14)
-                inex_df["ITEM"] = inex_df.get("ITEM", "")
+                if "ITEM" not in inex_df.columns:
+                    inex_df["ITEM"] = ""
+                if "INEX" not in inex_df.columns:
+                    inex_df["INEX"] = ""
+
                 resultado["CNPJ_Base"] = resultado["CNPJ/CPF"].str.replace(r'\D', '', regex=True).str.zfill(14)
 
                 merge_df = resultado.merge(inex_df[['CNPJ', 'ITEM', 'INEX']], how='left', left_on="CNPJ_Base", right_on="CNPJ")
@@ -137,8 +132,10 @@ class ConversorMapasFrame(ctk.CTkFrame):
 
             resultado.to_excel(caminho_completo, index=False)
             self.status.configure(text=f"✅ Arquivo salvo: {nome_arquivo}", text_color="green")
+
         except Exception as e:
             self.status.configure(text=f"❌ Erro: {str(e)}", text_color="red")
         finally:
             self.progress.stop()
             self.progress.pack_forget()
+            self.btn_converter.configure(state="normal")
