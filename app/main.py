@@ -27,7 +27,7 @@ class InicioFrame(ctk.CTkFrame):
         ctk.CTkLabel(main_frame, text="Sistema Administrativo - COPESP", 
                     font=("Arial", 26, "bold")).pack(pady=30)
 
-        ctk.CTkLabel(main_frame, text="Selecione o arquivo do mapa (arquivo Excel) e a pasta onde serão salvos os resultados", 
+        ctk.CTkLabel(main_frame, text="Selecione o arquivo do mapa (.xlsx) e a pasta onde serão salvos os resultados.", 
                     font=("Arial", 16)).pack(pady=10)
 
         button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")

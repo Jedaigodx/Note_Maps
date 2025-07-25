@@ -55,7 +55,6 @@ class PDFTabela(FPDF):
         self.cell(larguras['Valor'], 8, total_texto, border=1, align='C')
         self.ln()
 
-
 class GeradorPDFFaturaFrame(ctk.CTkFrame):
     def __init__(self, master, app=None):
         super().__init__(master)
