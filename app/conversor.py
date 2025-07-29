@@ -13,7 +13,6 @@ class ConversorMapasFrame(ctk.CTkFrame):
 
         self._build_ui()
 
-        # Inicializar com os caminhos do app, se já selecionados
         if self.app:
             if self.app.arquivo_mapa:
                 self.atualizar_arquivo_mapa(self.app.arquivo_mapa)

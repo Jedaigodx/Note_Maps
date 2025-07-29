@@ -19,6 +19,7 @@ class PDFTabela(FPDF):
             'CPF': 25,
             'Guia': 12,
             'Plano Interno': 22,
+            'Fatura': 18,
             'enc titular': 50,
             'enc dependente': 50,
             'Valor': 22
@@ -146,13 +147,13 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
             (self.df['Fatura'].isin(self.selected_faturas)) &
             (self.df['Plano Interno'] == plano)
         ]
-
+        dados_filtrados = dados_filtrados.sort_values(by='Fatura')
         if dados_filtrados.empty:
             self.status.configure(text="Nenhum dado encontrado com os filtros!", text_color="red")
             return
 
         nome_clinica = str(dados_filtrados['Nome'].iloc[0])
-        colunas_exibir = ['CNPJ', 'CPF', 'Guia', 'Plano Interno', 'enc titular', 'enc dependente', 'Valor']
+        colunas_exibir = ['CNPJ', 'CPF', 'Guia','Fatura', 'Plano Interno', 'enc titular', 'enc dependente', 'Valor']
 
         pdf = PDFTabela()
         pdf.titulo = nome_clinica
