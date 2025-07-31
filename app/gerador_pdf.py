@@ -5,7 +5,7 @@ from tkinter import filedialog
 
 class PDFTabela(FPDF):
     def tabela(self, dados, colunas):
-        usar_cnpj = dados['CNPJ'].notnull().any()
+        usar_cnpj = dados['CNPJ'].apply(lambda x: str(x).strip() not in ["", "0", "nan", "None"]).any()
         usar_cpf = not usar_cnpj
 
         colunas_usadas = [c for c in colunas if c != 'CNPJ' and c != 'CPF']
@@ -16,13 +16,13 @@ class PDFTabela(FPDF):
 
         larguras = {
             'CNPJ': 22,
-            'CPF': 25,
+            'CPF': 22,
             'Guia': 12,
             'Plano Interno': 22,
-            'Fatura': 18,
+            'Fatura': 12,
             'enc titular': 50,
             'enc dependente': 50,
-            'Valor': 22
+            'Valor': 20
         }
 
         if self.page_no() == 1:
@@ -59,24 +59,27 @@ class PDFTabela(FPDF):
 class GeradorPDFFaturaFrame(ctk.CTkFrame):
     def __init__(self, master, app=None):
         super().__init__(master)
-        self.app = app  
-
-        # Variáveis para dados
+        self.app = app
         self.df = None
         self.faturas_unicas = []
         self.selected_faturas = []
-
         self._build_ui()
 
     def _build_ui(self):
         ctk.CTkLabel(self, text="Relatório financeiro", font=("Arial", 22, "bold")).pack(pady=20)
 
-        # checkboxes
-        self.check_frame = ctk.CTkScrollableFrame(self, height=250)
-        self.check_frame.pack(pady=5)
+        # Frame horizontal para checkboxes + botão limpar
+        self.check_filtros_frame = ctk.CTkFrame(self)
+        self.check_filtros_frame.pack(pady=5)
+
+        self.check_frame = ctk.CTkScrollableFrame(self.check_filtros_frame, height=250, width=200)
+        self.check_frame.pack(side='left', padx=(0, 10))
+
+        self.limpar_btn = ctk.CTkButton(self.check_filtros_frame, text="Limpar", command=self.limpar_filtros)
+        self.limpar_btn.pack(side='left', pady=5)
+
         self.checkboxes = []
 
-        
         ctk.CTkLabel(self, text="Plano Interno:").pack(pady=10)
         self.plano_combo = ctk.CTkComboBox(self, values=[], state='disabled')
         self.plano_combo.pack()
@@ -107,7 +110,8 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
             return
 
         for _, cb in self.checkboxes:
-            cb.destroy()
+            if cb.winfo_exists():
+                cb.destroy()
         self.checkboxes.clear()
 
         for fat in self.faturas_unicas:
@@ -143,40 +147,45 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
             self.status.configure(text="Selecione um Plano Interno válido.", text_color="red")
             return
 
-        dados_filtrados = self.df[
-            (self.df['Fatura'].isin(self.selected_faturas)) &
-            (self.df['Plano Interno'] == plano)
-        ]
+        dados_filtrados = self.df[(self.df['Fatura'].isin(self.selected_faturas)) & (self.df['Plano Interno'] == plano)]
         dados_filtrados = dados_filtrados.sort_values(by='Fatura')
+
         if dados_filtrados.empty:
             self.status.configure(text="Nenhum dado encontrado com os filtros!", text_color="red")
             return
 
         nome_clinica = str(dados_filtrados['Nome'].iloc[0])
-        colunas_exibir = ['CNPJ', 'CPF', 'Guia','Fatura', 'Plano Interno', 'enc titular', 'enc dependente', 'Valor']
+        colunas_exibir = ['CNPJ', 'CPF', 'Guia', 'Fatura', 'Plano Interno', 'enc titular', 'enc dependente', 'Valor']
 
         pdf = PDFTabela()
         pdf.titulo = nome_clinica
         pdf.add_page()
         pdf.tabela(dados_filtrados, colunas_exibir)
-      
+
         pasta_destino = self.app.pasta_destino if (self.app and self.app.pasta_destino) else None
         nome_arquivo = f"Fatura_{'_'.join(map(str, map(int, self.selected_faturas)))}_{plano}.pdf"
         caminho_arquivo = nome_arquivo
+
         if pasta_destino:
             import os
             caminho_arquivo = os.path.join(pasta_destino, nome_arquivo)
+
         try:
             pdf.output(caminho_arquivo)
             self.status.configure(text=f"✅ PDF gerado: {caminho_arquivo}", text_color="green")
         except Exception as e:
             self.status.configure(text=f"Erro ao salvar PDF: {str(e)}", text_color="red")
 
+    def limpar_filtros(self):
+        for _, cb in self.checkboxes:
+            cb.deselect()   
+        self.atualizar_planos()
+
     def atualizar_arquivo_mapa(self, caminho):
         self.app.arquivo_mapa = caminho
         self.status.configure(text=f"Arquivo mapa anexado: {caminho}", text_color="green")
-        self.carregar_excel()
-  
+        self.after(100, self.carregar_excel)
+
     def atualizar_pasta_destino(self, caminho):
         self.app.pasta_destino = caminho
         self.status.configure(text=f"Pasta destino definida: {caminho}", text_color="green")
