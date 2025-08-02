@@ -61,14 +61,14 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
         super().__init__(master)
         self.app = app
         self.df = None
-        self.faturas_unicas = []
+        self.faturas_repetidas = []  
         self.selected_faturas = []
         self._build_ui()
 
     def _build_ui(self):
         ctk.CTkLabel(self, text="Relatório financeiro", font=("Arial", 22, "bold")).pack(pady=20)
 
-        # Frame horizontal para checkboxes + botão limpar
+        
         self.check_filtros_frame = ctk.CTkFrame(self)
         self.check_filtros_frame.pack(pady=5)
 
@@ -104,7 +104,12 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
 
         try:
             self.df = pd.read_excel(caminho_excel, sheet_name="Sheet1")
-            self.faturas_unicas = sorted(self.df['Fatura'].dropna().unique())
+            usa_cnpj = self.df['CNPJ'].apply(lambda x: str(x).strip() not in ["", "0", "nan", "None"]).any()
+            id_col = 'CNPJ' if usa_cnpj else 'CPF'
+
+            grupo = self.df.groupby(['Fatura', id_col]).size().reset_index()
+            self.faturas_repetidas = [(row['Fatura'], row[id_col]) for _, row in grupo.iterrows()]
+
         except Exception as e:
             self.status.configure(text=f"Erro ao ler arquivo: {str(e)}", text_color="red")
             return
@@ -114,24 +119,32 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
                 cb.destroy()
         self.checkboxes.clear()
 
-        for fat in self.faturas_unicas:
-            cb = ctk.CTkCheckBox(self.check_frame, text=str(int(fat)), command=self.atualizar_planos)
+        for fat, id_val in self.faturas_repetidas:
+            texto_cb = f"{int(fat)} - {id_val}"
+            cb = ctk.CTkCheckBox(self.check_frame, text=texto_cb, command=self.atualizar_planos)
             cb.pack(anchor='w')
-            self.checkboxes.append((fat, cb))
+            self.checkboxes.append(((fat, id_val), cb))
 
         self.plano_combo.configure(values=[], state='disabled')
         self.gerar_btn.configure(state='disabled')
         self.status.configure(text="Arquivo carregado com sucesso.", text_color="green")
 
     def atualizar_planos(self):
-        self.selected_faturas = [fat for fat, cb in self.checkboxes if cb.get()]
+        self.selected_faturas = [fat_id for fat_id, cb in self.checkboxes if cb.get()]
         if not self.selected_faturas:
             self.plano_combo.configure(values=[], state='disabled')
             self.gerar_btn.configure(state='disabled')
             return
 
-        planos = self.df[self.df['Fatura'].isin(self.selected_faturas)]['Plano Interno'].dropna().unique()
-        planos_ordenados = sorted(planos)   
+        usa_cnpj = self.df['CNPJ'].apply(lambda x: str(x).strip() not in ["", "0", "nan", "None"]).any()
+        id_col = 'CNPJ' if usa_cnpj else 'CPF'
+
+        filtro = pd.Series(False, index=self.df.index)
+        for fat, id_val in self.selected_faturas:
+            filtro = filtro | ((self.df['Fatura'] == fat) & (self.df[id_col] == id_val))
+
+        planos = self.df.loc[filtro, 'Plano Interno'].dropna().unique()
+        planos_ordenados = sorted(planos)
         self.plano_combo.configure(values=planos_ordenados, state='normal')
         if planos_ordenados:
             self.plano_combo.set(planos_ordenados[0])
@@ -147,7 +160,14 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
             self.status.configure(text="Selecione um Plano Interno válido.", text_color="red")
             return
 
-        dados_filtrados = self.df[(self.df['Fatura'].isin(self.selected_faturas)) & (self.df['Plano Interno'] == plano)]
+        usa_cnpj = self.df['CNPJ'].apply(lambda x: str(x).strip() not in ["", "0", "nan", "None"]).any()
+        id_col = 'CNPJ' if usa_cnpj else 'CPF'
+
+        filtro = pd.Series(False, index=self.df.index)
+        for fat, id_val in self.selected_faturas:
+            filtro = filtro | ((self.df['Fatura'] == fat) & (self.df[id_col] == id_val))
+
+        dados_filtrados = self.df.loc[filtro & (self.df['Plano Interno'] == plano)]
         dados_filtrados = dados_filtrados.sort_values(by='Fatura')
 
         if dados_filtrados.empty:
@@ -163,7 +183,7 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
         pdf.tabela(dados_filtrados, colunas_exibir)
 
         pasta_destino = self.app.pasta_destino if (self.app and self.app.pasta_destino) else None
-        nome_arquivo = f"Fatura_{'_'.join(map(str, map(int, self.selected_faturas)))}_{plano}.pdf"
+        nome_arquivo = f"Fatura_{'_'.join([str(int(fat)) for fat, _ in self.selected_faturas])}_{plano}.pdf"
         caminho_arquivo = nome_arquivo
 
         if pasta_destino:
@@ -178,7 +198,7 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
 
     def limpar_filtros(self):
         for _, cb in self.checkboxes:
-            cb.deselect()   
+            cb.deselect()
         self.atualizar_planos()
 
     def atualizar_arquivo_mapa(self, caminho):
