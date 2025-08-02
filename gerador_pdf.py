@@ -7,6 +7,8 @@ from tkinter import filedialog
 BTN_FG = "#0B8052"
 BTN_HOVER = "#0E9E66"
 TEXT_COLOR_GRAY = "#A0A0A0"
+SIDEBAR_BTN_FG = "#134E8B"
+SIDEBAR_BTN_HOVER = "#1D67B5"
 
 class PDFTabela(FPDF):
     def tabela(self, dados, colunas):
@@ -71,7 +73,7 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
         self._build_ui()
 
     def _build_ui(self):
-        ctk.CTkLabel(self, text="Relatório financeiro", font=("Segoe UI", 28, "bold")).pack(pady=20)
+        ctk.CTkLabel(self, text="Relatório financeiro", font=("Segoe UI", 28, "bold")).pack(pady=(30,20))
         ctk.CTkFrame(self, height=2, fg_color="gray").pack(fill="x", padx=30, pady=(0, 40))
 
         self.check_filtros_frame = ctk.CTkFrame(self, fg_color="#2b2b2b")
@@ -80,7 +82,18 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
         self.check_frame = ctk.CTkScrollableFrame(self.check_filtros_frame, height=250, width=200)
         self.check_frame.pack(side='left', padx=(0, 10))
 
-        self.limpar_btn = ctk.CTkButton(self.check_filtros_frame, text="Limpar", command=self.limpar_filtros)
+        self.limpar_btn = ctk.CTkButton(
+            self.check_filtros_frame,
+            text="Limpar",
+            command=self.limpar_filtros,
+            font=("Segoe UI", 16, "bold"),
+            text_color=TEXT_COLOR_GRAY,
+            fg_color=SIDEBAR_BTN_FG,
+            hover_color=SIDEBAR_BTN_HOVER,
+            width=50,
+            height=30,
+            corner_radius=4
+        )
         self.limpar_btn.pack(side='left', pady=5)
 
         self.checkboxes = []
@@ -131,6 +144,9 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
             if cb.winfo_exists():
                 cb.destroy()
         self.checkboxes.clear()
+
+        self.label_checkboxes = ctk.CTkLabel(self.check_frame, text="Fatura - CNPJ/CPF", font=("Segoe UI", 14, "bold"))
+        self.label_checkboxes.pack(anchor='w', pady=(0, 5))
 
         for fat, id_val in self.faturas_repetidas:
             texto_cb = f"{int(fat)} - {id_val}"
