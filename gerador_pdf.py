@@ -131,7 +131,7 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
             return
 
         planos = self.df[self.df['Fatura'].isin(self.selected_faturas)]['Plano Interno'].dropna().unique()
-        planos_ordenados = sorted(planos)
+        planos_ordenados = sorted(planos)   
         self.plano_combo.configure(values=planos_ordenados, state='normal')
         if planos_ordenados:
             self.plano_combo.set(planos_ordenados[0])
