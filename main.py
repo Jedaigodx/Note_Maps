@@ -4,15 +4,18 @@ import os
 from conversor import ConversorMapasFrame
 from gerador_pdf import GeradorPDFFaturaFrame
 
-# Cores 
-BTN_FG = "#04573B"
-BTN_HOVER = "#093828"
+# Cores
+BTN_FG = "#0B8052"
+BTN_HOVER = "#0E9E66"
 SIDEBAR_BG = "#0F172A"
 CONTAINER_BG = "#1E293B"
-SIDEBAR_BTN_FG = "#062F88"
-SIDEBAR_BTN_HOVER = "#1D47A0"
+SIDEBAR_BTN_FG = "#134E8B"
+SIDEBAR_BTN_HOVER = "#1D67B5"
 SIDEBAR_BTN_ACTIVE = "#288ED3"
+TEXT_COLOR_GRAY = "#A0A0A0"
+HEADER_COLOR = "#E0E0E0"
 
+# Configuração do tema
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
@@ -21,117 +24,211 @@ class InicioFrame(ctk.CTkFrame):
         super().__init__(master)
         self.app = app
 
-        main_frame = ctk.CTkFrame(self, fg_color="transparent")
-        main_frame.pack(expand=True, fill="both", padx=20, pady=20)
+        self.columnconfigure((0, 1), weight=1)
+        self.rowconfigure((0,1,2,3,4), weight=1)
 
-        ctk.CTkLabel(main_frame, text="Sistema Administrativo - COPESP", 
-                    font=("Arial", 26, "bold")).pack(pady=30)
+        titulo = ctk.CTkLabel(
+            self, 
+            text="Sistema Administrativo - COPESP",
+            font=("Segoe UI", 30, "bold"),
+            text_color=HEADER_COLOR
+        )
+        titulo.grid(row=0, column=0, columnspan=2, pady=(30,10))
 
-        ctk.CTkLabel(main_frame, text="Selecione o arquivo do mapa (.xlsx) e a pasta onde serão salvos os resultados.", 
-                    font=("Arial", 16)).pack(pady=10)
+        subtitulo = ctk.CTkLabel(
+            self,
+            text="Selecione o arquivo do mapa (.xlsx) e a pasta onde serão salvos os resultados.",
+            font=("Segoe UI", 16),
+            wraplength=600,
+            justify="center",
+            text_color=TEXT_COLOR_GRAY
+        )
+        subtitulo.grid(row=1, column=0, columnspan=2, pady=(20, 10), padx=20)
 
-        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        button_frame.pack(pady=20)
+        btn_anexar = ctk.CTkButton(
+            self,
+            text="➕ Anexar Mapa",
+            command=self.app.anexar_mapa,
+            fg_color=BTN_FG,
+            hover_color=BTN_HOVER,
+            font=("Segoe UI", 18, "bold"),
+            width=180,
+            height=60,
+            corner_radius=10
+        )
+        btn_anexar.grid(row=2, column=0, padx=30, sticky="e")
 
-        ctk.CTkButton(button_frame, text="➕ ANEXAR MAPA",
-                     command=self.app.anexar_mapa,
-                     fg_color=BTN_FG,
-                     hover_color=BTN_HOVER,
-                     font=("Arial", 14, "bold"),
-                     height=50,
-                     width=180).pack(side="left", padx=10)
+        btn_pasta = ctk.CTkButton(
+            self,
+            text="📁 Selecionar Pasta",
+            command=self.app.selecionar_pasta_destino,
+            fg_color=BTN_FG,
+            hover_color=BTN_HOVER,
+            font=("Segoe UI", 18, "bold"),
+            width=180,
+            height=60,
+            corner_radius=10
+        )
+        btn_pasta.grid(row=2, column=1, padx=30, sticky="w")
 
-        ctk.CTkButton(button_frame, text="➕ SELECIONAR PASTA",
-                     command=self.app.selecionar_pasta_destino,
-                     fg_color=BTN_FG,
-                     hover_color=BTN_HOVER,
-                     font=("Arial", 14, "bold"),
-                     height=50,
-                     width=180).pack(side="left", padx=10)
+        info = ctk.CTkLabel(
+            self,
+            text="Escolha uma das opções ao lado para iniciar.",
+            font=("Segoe UI", 16),
+            text_color=TEXT_COLOR_GRAY
+        )
+        info.grid(row=3, column=0, columnspan=2, pady=20)
 
-        ctk.CTkLabel(main_frame, text="Escolha uma das opções ao lado para iniciar.", 
-                    font=("Arial", 16)).pack(pady=10)
+        self.status_label = ctk.CTkLabel(
+            self,
+            text="",
+            font=("Segoe UI", 14),
+            text_color=TEXT_COLOR_GRAY
+        )
+        self.status_label.grid(row=4, column=0, columnspan=2, pady=(0,10))
 
-        self.status_label = ctk.CTkLabel(main_frame, text="", font=("Arial", 12), text_color="gray")
-        self.status_label.pack(side="bottom", pady=10)
-
-        ctk.CTkLabel(main_frame, text="Desenvolvido por Cb Pacífico", 
-                    font=("Arial", 12, "italic"), 
-                    text_color="gray").pack(side="bottom", pady=10)
+        rodape = ctk.CTkLabel(
+            self,
+            text="Desenvolvido por Cb Pacífico",
+            font=("Segoe UI", 12, "italic"),
+            text_color=TEXT_COLOR_GRAY
+        )
+        rodape.grid(row=5, column=0, columnspan=2, pady=(10,30))
 
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Note Maps")
-        self.geometry("950x650")
-        self.resizable(True, True)
+
+        self.title("Note Maps - COPESP")
+        self.geometry("970x700")
+        self.minsize(950, 650)
+        self.configure(bg=SIDEBAR_BG)
 
         self.arquivo_mapa = None
         self.pasta_destino = None
 
-        self.sidebar = ctk.CTkFrame(self, width=220, fg_color=SIDEBAR_BG)
+        # Sidebar
+        self.sidebar = ctk.CTkFrame(self, width=260, fg_color=SIDEBAR_BG)
         self.sidebar.pack(side="left", fill="y")
 
+        # Container principal
         self.container = ctk.CTkFrame(self, fg_color=CONTAINER_BG)
         self.container.pack(side="right", fill="both", expand=True)
 
-        ctk.CTkLabel(self.sidebar, text="Menu", font=("Arial", 20, "bold")).pack(pady=20)
+        # Título Sidebar
+        ctk.CTkLabel(
+            self.sidebar,
+            text="Menu Principal",
+            font=("Segoe UI", 26, "bold"),
+            pady=30,
+            text_color=HEADER_COLOR
+        ).pack()
 
-        ctk.CTkButton(self.sidebar, text="🏠 Início", 
-                     command=self.show_inicio, 
-                     fg_color=SIDEBAR_BTN_FG,
-                     hover_color=SIDEBAR_BTN_HOVER,
-                     font=("Arial",16, "bold"),
-                     height=30).pack(fill="x", pady=(10,20), padx=15)
+        # Função para criar botões da sidebar
+        def criar_botao_sidebar(texto, comando, ativo=False):
+            cor_fundo = SIDEBAR_BTN_ACTIVE if ativo else SIDEBAR_BTN_FG
+            return ctk.CTkButton(
+                self.sidebar,
+                text=texto,
+                command=comando,
+                fg_color=cor_fundo,
+                hover_color=SIDEBAR_BTN_HOVER,
+                font=("Segoe UI", 17 if ativo else 14, "bold"),
+                height=40,
+                anchor="w",
+                corner_radius=12
+            )
+
+        ctk.CTkButton(
+            self.sidebar,
+            text="🏠 Início",
+            command=self.show_inicio,
+            fg_color=SIDEBAR_BTN_ACTIVE,          
+            hover_color=SIDEBAR_BTN_HOVER,        
+            text_color="#ffffff",         
+            font=("Segoe UI", 18, "bold"),
+            height=38,                    
+            corner_radius=7,             
+            border_width=0.5,               
+            border_color=CONTAINER_BG,       
+            anchor="center",              
+            )\
+        .pack(fill="x", pady=(10,20), padx=15)
 
         ctk.CTkButton(self.sidebar, text="🧾 Gerar Extrato NF", 
-                     command=self.show_conversor,
-                     fg_color=SIDEBAR_BTN_ACTIVE,
-                     hover_color=SIDEBAR_BTN_HOVER,
-                     font=("Arial",14, "bold"),
-                     height=30,anchor="w").pack(fill="x", pady=(5,7), padx=15)
+            command=self.show_conversor,
+            fg_color=SIDEBAR_BTN_ACTIVE,           
+            hover_color=SIDEBAR_BTN_HOVER,        
+            text_color="#ffffff",         
+            font=("Segoe UI", 18, "bold"),
+            height=38,                    
+            corner_radius=7,            
+            border_width=2,               
+            border_color=CONTAINER_BG,       
+            anchor="center",              
+            )\
+        .pack(fill="x", pady=(5,7), padx=15)
 
         ctk.CTkButton(self.sidebar, text="📄 Gerar Relatório", 
-                     command=self.show_pdf,
-                     fg_color=SIDEBAR_BTN_ACTIVE,
-                     hover_color=SIDEBAR_BTN_HOVER,
-                     font=("Arial",14, "bold"),
-                     height=30, 
-                     anchor="w").pack(fill="x", pady=(5,10), padx=15)
+            command=self.show_pdf,
+            fg_color=SIDEBAR_BTN_ACTIVE,           
+            hover_color=SIDEBAR_BTN_HOVER,        
+            text_color="#ffffff",         
+            font=("Segoe UI", 18, "bold"),
+            height=38,                    
+            corner_radius=7,            
+            border_width=2,               
+            border_color=CONTAINER_BG,       
+            anchor="center",              
+            )\
+        .pack(fill="x", pady=(5,7), padx=15)
 
-        self.status_label = ctk.CTkLabel(self.sidebar, text="Nenhum arquivo anexado", font=("Arial", 10), text_color="gray")
-        self.status_label.pack(side="bottom", pady=10, padx=10)
+        ctk.CTkFrame( self.sidebar,height=2,fg_color=CONTAINER_BG,  corner_radius=1).pack(fill="x", padx=24, pady=12)
+        
+        self.status_label = ctk.CTkLabel(
+            self.sidebar,
+            text="Nenhum arquivo anexado",
+            font=("Segoe UI", 12),
+            text_color=TEXT_COLOR_GRAY,
+            wraplength=220,
+            justify="center"
+        )
+        self.status_label.pack(side="bottom", pady=20, padx=20)
 
         self.frames = {}
         self.current_frame = None
         self.show_inicio()
 
+        # Atalhos de teclado para trocar telas
         self.bind_all("<Control-1>", lambda e: self.show_inicio())
         self.bind_all("<Control-2>", lambda e: self.show_conversor())
         self.bind_all("<Control-3>", lambda e: self.show_pdf())
 
     def anexar_mapa(self):
-        path = filedialog.askopenfilename(title="Selecione o arquivo Excel do mapa", filetypes=[("Excel files", "*.xlsx *.xls")])
+        path = filedialog.askopenfilename(
+            title="Selecione o arquivo Excel do mapa",
+            filetypes=[("Arquivos Excel", "*.xlsx *.xls")]
+        )
         if path:
             self.arquivo_mapa = path
-            self.status_label.configure(text=f"Arquivo mapa anexado: {os.path.basename(path)}")
+            self.status_label.configure(text=f"Arquivo mapa anexado:\n{os.path.basename(path)}")
             self.atualizar_frames_arquivo(path)
 
     def selecionar_pasta_destino(self):
         path = filedialog.askdirectory(title="Selecione a pasta destino")
         if path:
             self.pasta_destino = path
-            self.status_label.configure(text=f"Pasta destino selecionada: {path}")
+            self.status_label.configure(text=f"Pasta destino selecionada:\n{path}")
             self.atualizar_frames_pasta(path)
 
     def atualizar_frames_arquivo(self, path):
         for frame in self.frames.values():
-            if hasattr(frame, 'atualizar_arquivo_mapa'):
+            if hasattr(frame, "atualizar_arquivo_mapa"):
                 frame.atualizar_arquivo_mapa(path)
 
     def atualizar_frames_pasta(self, path):
         for frame in self.frames.values():
-            if hasattr(frame, 'atualizar_pasta_destino'):
+            if hasattr(frame, "atualizar_pasta_destino"):
                 frame.atualizar_pasta_destino(path)
 
     def show_frame(self, frame_class):

@@ -4,6 +4,11 @@ from tkinter import filedialog
 import os
 from datetime import datetime
 
+#colors
+BTN_FG = "#0B8052"
+BTN_HOVER = "#0E9E66"
+TEXT_COLOR_GRAY = "#A0A0A0"
+
 class ConversorMapasFrame(ctk.CTkFrame):
     def __init__(self, master, app=None):
         super().__init__(master)
@@ -20,16 +25,46 @@ class ConversorMapasFrame(ctk.CTkFrame):
                 self.atualizar_pasta_destino(self.app.pasta_destino)
 
     def _build_ui(self):
-        ctk.CTkLabel(self, text="Conversor de Execução Orçamentária", font=("Arial", 22, "bold")).pack(pady=20)
-        ctk.CTkFrame(self, height=2, fg_color="gray").pack(fill="x", padx=30, pady=(0, 20))
+        ctk.CTkLabel(self, text="Conversor de Execução Orçamentária", font=("Segoe UI", 28, "bold")).pack(pady=(30,20))
+        ctk.CTkFrame(self, height=2, fg_color="gray").pack(fill="x", padx=30, pady=(0, 40))
 
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(pady=10)
 
-        self.btn_anexar_inex = ctk.CTkButton(btn_frame, text="📎 Anexar INEX (opcional)", command=self.anexar_inex, width=180, height=45)
-        self.btn_anexar_inex.pack(side="left", padx=10)
+        subtitulo = ctk.CTkLabel(
+            self,
+            text="Selecione o arquivo INEX opcional (.xlsx) para complementar os dados do relatório. Caso não possua, continue apenas com o mapa principal na opção Gerar extrato.",
+            font=("Segoe UI", 14),
+            wraplength=600,
+            justify="center",
+            text_color=TEXT_COLOR_GRAY
+        )
+        subtitulo.pack(pady=(30, 10), padx=20)
+        
+        self.btn_anexar_inex = ctk.CTkButton(
+            btn_frame,
+            text="📎 Anexar INEX ",
+            command=self.anexar_inex,
+            fg_color=BTN_FG,
+            hover_color=BTN_HOVER,
+            font=("Segoe UI", 18, "bold"),
+            width=180,
+            height=60,
+            corner_radius=12
+        )
+        self.btn_anexar_inex.pack(side="left", padx=12, pady=4)
 
-        self.btn_converter = ctk.CTkButton(btn_frame, text="📤 Gerar extrato", command=self.converter, width=180, height=45)
+        self.btn_converter = ctk.CTkButton(
+            btn_frame, 
+            text="📤 Gerar extrato",  
+            command=self.converter,            
+            fg_color=BTN_FG,
+            hover_color=BTN_HOVER,
+            font=("Segoe UI", 18, "bold"),
+            width=180,
+            height=60,
+            corner_radius=12
+        )
         self.btn_converter.pack(side="left", padx=10)
 
         self.progress = ctk.CTkProgressBar(self, mode="indeterminate")
