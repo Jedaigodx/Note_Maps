@@ -3,6 +3,11 @@ import customtkinter as ctk
 from fpdf import FPDF
 from tkinter import filedialog
 
+#colors
+BTN_FG = "#0B8052"
+BTN_HOVER = "#0E9E66"
+TEXT_COLOR_GRAY = "#A0A0A0"
+
 class PDFTabela(FPDF):
     def tabela(self, dados, colunas):
         usar_cnpj = dados['CNPJ'].apply(lambda x: str(x).strip() not in ["", "0", "nan", "None"]).any()
@@ -66,10 +71,10 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
         self._build_ui()
 
     def _build_ui(self):
-        ctk.CTkLabel(self, text="Relatório financeiro", font=("Arial", 22, "bold")).pack(pady=20)
+        ctk.CTkLabel(self, text="Relatório financeiro", font=("Segoe UI", 28, "bold")).pack(pady=20)
+        ctk.CTkFrame(self, height=2, fg_color="gray").pack(fill="x", padx=30, pady=(0, 40))
 
-        
-        self.check_filtros_frame = ctk.CTkFrame(self)
+        self.check_filtros_frame = ctk.CTkFrame(self, fg_color="#2b2b2b")
         self.check_filtros_frame.pack(pady=5)
 
         self.check_frame = ctk.CTkScrollableFrame(self.check_filtros_frame, height=250, width=200)
@@ -84,11 +89,19 @@ class GeradorPDFFaturaFrame(ctk.CTkFrame):
         self.plano_combo = ctk.CTkComboBox(self, values=[], state='disabled')
         self.plano_combo.pack()
 
-        self.gerar_btn = ctk.CTkButton(self, text="Gerar PDF", command=self.gerar_pdf, state='disabled')
-        self.gerar_btn.pack(pady=30)
 
+        self.gerar_btn = ctk.CTkButton(self, text="Gerar PDF", command=self.gerar_pdf,
+        state='disabled',
+        font=("Segoe UI", 18, "bold"),
+        text_color="#ffffff",
+        fg_color=BTN_FG,
+        hover_color=BTN_HOVER,
+        )
+        self.gerar_btn.pack(pady=30)
+        
         self.status = ctk.CTkLabel(self, text="", text_color="green")
         self.status.pack()
+        
 
     def carregar_excel(self):
         if self.app and self.app.arquivo_mapa:

@@ -169,7 +169,7 @@ class App(ctk.CTk):
             )\
         .pack(fill="x", pady=(5,7), padx=15)
 
-        ctk.CTkButton(self.sidebar, text="📄 Gerar Relatório", 
+        ctk.CTkButton(self.sidebar, text="📄 Relatório Detalhado", 
             command=self.show_pdf,
             fg_color=SIDEBAR_BTN_ACTIVE,           
             hover_color=SIDEBAR_BTN_HOVER,        
