@@ -1,8 +1,17 @@
 import customtkinter as ctk
 from tkinter import filedialog
 import os
+import sys
 from conversor import ConversorMapasFrame
 from gerador_pdf import GeradorPDFFaturaFrame
+
+# Função empacotado .exe
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 # Cores
 BTN_FG = "#0B8052"
@@ -15,7 +24,6 @@ SIDEBAR_BTN_ACTIVE = "#288ED3"
 TEXT_COLOR_GRAY = "#A0A0A0"
 HEADER_COLOR = "#E0E0E0"
 
-# Configuração do tema
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
@@ -99,6 +107,7 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
 
+        self.iconbitmap(resource_path("icone.ico"))  # <- corrigido aqui
         self.title("Note Maps - COPESP")
         self.geometry("970x700")
         self.minsize(950, 650)
@@ -107,15 +116,12 @@ class App(ctk.CTk):
         self.arquivo_mapa = None
         self.pasta_destino = None
 
-        # Sidebar
         self.sidebar = ctk.CTkFrame(self, width=260, fg_color=SIDEBAR_BG)
         self.sidebar.pack(side="left", fill="y")
 
-        # Container principal
         self.container = ctk.CTkFrame(self, fg_color=CONTAINER_BG)
         self.container.pack(side="right", fill="both", expand=True)
 
-        # Título Sidebar
         ctk.CTkLabel(
             self.sidebar,
             text="Menu Principal",
@@ -124,7 +130,6 @@ class App(ctk.CTk):
             text_color=HEADER_COLOR
         ).pack()
 
-        # Função para criar botões da sidebar
         def criar_botao_sidebar(texto, comando, ativo=False):
             cor_fundo = SIDEBAR_BTN_ACTIVE if ativo else SIDEBAR_BTN_FG
             return ctk.CTkButton(
@@ -143,48 +148,49 @@ class App(ctk.CTk):
             self.sidebar,
             text="🏠 Início",
             command=self.show_inicio,
-            fg_color=SIDEBAR_BTN_ACTIVE,          
-            hover_color=SIDEBAR_BTN_HOVER,        
-            text_color="#ffffff",         
+            fg_color=SIDEBAR_BTN_ACTIVE,
+            hover_color=SIDEBAR_BTN_HOVER,
+            text_color="#ffffff",
             font=("Segoe UI", 18, "bold"),
-            height=38,                    
-            corner_radius=7,             
-            border_width=0.5,               
-            border_color=CONTAINER_BG,       
-            anchor="center",              
-            )\
-        .pack(fill="x", pady=(10,20), padx=15)
+            height=38,
+            corner_radius=7,
+            border_width=0.5,
+            border_color=CONTAINER_BG,
+            anchor="center",
+        ).pack(fill="x", pady=(10,20), padx=15)
 
-        ctk.CTkButton(self.sidebar, text="🧾 Gerar Extrato NF", 
+        ctk.CTkButton(
+            self.sidebar,
+            text="🧾 Gerar Extrato NF", 
             command=self.show_conversor,
-            fg_color=SIDEBAR_BTN_ACTIVE,           
-            hover_color=SIDEBAR_BTN_HOVER,        
-            text_color="#ffffff",         
+            fg_color=SIDEBAR_BTN_ACTIVE,
+            hover_color=SIDEBAR_BTN_HOVER,
+            text_color="#ffffff",
             font=("Segoe UI", 18, "bold"),
-            height=38,                    
-            corner_radius=7,            
-            border_width=2,               
-            border_color=CONTAINER_BG,       
-            anchor="center",              
-            )\
-        .pack(fill="x", pady=(5,7), padx=15)
+            height=38,
+            corner_radius=7,
+            border_width=2,
+            border_color=CONTAINER_BG,
+            anchor="center",
+        ).pack(fill="x", pady=(5,7), padx=15)
 
-        ctk.CTkButton(self.sidebar, text="📄 Relatório Detalhado", 
+        ctk.CTkButton(
+            self.sidebar,
+            text="📄 Relatório Detalhado", 
             command=self.show_pdf,
-            fg_color=SIDEBAR_BTN_ACTIVE,           
-            hover_color=SIDEBAR_BTN_HOVER,        
-            text_color="#ffffff",         
+            fg_color=SIDEBAR_BTN_ACTIVE,
+            hover_color=SIDEBAR_BTN_HOVER,
+            text_color="#ffffff",
             font=("Segoe UI", 18, "bold"),
-            height=38,                    
-            corner_radius=7,            
-            border_width=2,               
-            border_color=CONTAINER_BG,       
-            anchor="center",              
-            )\
-        .pack(fill="x", pady=(5,7), padx=15)
+            height=38,
+            corner_radius=7,
+            border_width=2,
+            border_color=CONTAINER_BG,
+            anchor="center",
+        ).pack(fill="x", pady=(5,7), padx=15)
 
-        ctk.CTkFrame( self.sidebar,height=2,fg_color=CONTAINER_BG,  corner_radius=1).pack(fill="x", padx=24, pady=12)
-        
+        ctk.CTkFrame(self.sidebar, height=2, fg_color=CONTAINER_BG, corner_radius=1).pack(fill="x", padx=24, pady=12)
+
         self.status_label = ctk.CTkLabel(
             self.sidebar,
             text="Nenhum arquivo anexado",
@@ -199,7 +205,6 @@ class App(ctk.CTk):
         self.current_frame = None
         self.show_inicio()
 
-        # Atalhos de teclado para trocar telas
         self.bind_all("<Control-1>", lambda e: self.show_inicio())
         self.bind_all("<Control-2>", lambda e: self.show_conversor())
         self.bind_all("<Control-3>", lambda e: self.show_pdf())
