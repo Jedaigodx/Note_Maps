@@ -14,7 +14,7 @@ Com uma interface intuitiva, o aplicativo permite importar arquivos Excel, aplic
 ## 🖼️ Imagens do Projeto
 
 <p float="left">
-  <img src="assets/tela_inicial.png" width="400"/>
+  <img src="assets/Tela_inicial.png" width="400"/>
   <img src="assets/Relatório_detalhado.png" width="400"/>
   <img src="assets/Conversor_de_execução_orçamentária.png" width="400"/>
 </p>
