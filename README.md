@@ -15,11 +15,9 @@ Com uma interface intuitiva, o aplicativo permite importar arquivos Excel, aplic
 
 <p float="left">
   <img src="assets/tela_inicial.png" width="400"/>
-  <img src="assets/filtro_dados.png" width="400"/>
-  <img src="assets/pdf_gerado.png" width="400"/>
+  <img src="assets/Relatório_detalhado.png" width="400"/>
+  <img src="assets/Conversor_de_execução_orçamentária.png" width="400"/>
 </p>
-
-> 🔁 **Coloque suas imagens na pasta `/assets` com os nomes sugeridos acima ou personalize conforme desejar.**
 
 ---
 
@@ -30,13 +28,13 @@ Com uma interface intuitiva, o aplicativo permite importar arquivos Excel, aplic
 - 🧾 Geração de relatórios organizados em PDF
 - 🤖 Detecção automática entre CNPJ e CPF
 - 🎨 Interface responsiva e moderna com CustomTkinter
-- ✅ Compatível com planilhas padrão da DPGO
+- ✅ Compatível com planilhas padrão da DPGO (.xlsx)
 
 ---
 
 ## 💻 Tecnologias Utilizadas
 
-- Python 3.x  
+- Python 3.13.5  
 - CustomTkinter (interface gráfica)
 - Pandas (manipulação de dados)
 - FPDF (criação de arquivos PDF)
@@ -55,8 +53,6 @@ cd Note_Maps
 
 2. Instale as bibliotecas necessárias:
 
-Como ainda não há um arquivo `requirements.txt`, você pode instalar os pacotes manualmente:
-
 ```bash
 pip install pandas fpdf customtkinter
 ```
@@ -73,9 +69,13 @@ python main.py
 
 ```
 Note_Maps/
+
 ├── assets/              # Imagens e ícones da interface
-├── main.py              # Arquivo principal do projeto
-├── README.md            # Documentação do projeto
+├── src/                 # Código-fonte principal
+│   ├── main.py          # Interface principal da aplicação
+│   ├── conversor.py     # Funções de leitura e formatação da planilha
+│   └── gerador.py       # Funções para geração de PDF
+└── README.md            # Documentação do projeto
 ```
 
 ---
