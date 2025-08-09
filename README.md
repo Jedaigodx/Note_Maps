@@ -84,7 +84,6 @@ Note_Maps/
 
 Desenvolvido por **Thallisson Henrique**  
 📍 Auxiliar Financeiro – Seção de Auditoria / COPESP  
-🎓 Cursando Análise e Desenvolvimento de Sistemas  
 📧 thallisson.h.tp@gmail.com 
 
 ---
