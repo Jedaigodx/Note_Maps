@@ -1,14 +1,15 @@
 """
-relatorio_cnpj_pdf.py  — Note Maps v2.0
-─────────────────────────────────────────
-Gera um PDF individual por prestador + Plano Interno,
-pronto para envio manual por e-mail.
+relatorio_cnpj_pdf.py  — Note Maps v2.1
+Gera PDF individual por prestador + Plano Interno para envio por e-mail.
 
-Correções v2.1:
-  • Fix encoding: fpdf 1.x usa Latin-1; caracteres fora do range
-    (ex.: travessão \u2014, acentos especiais) agora são convertidos
-    via encode('latin-1', errors='replace') antes de qualquer cell().
-  • Barra de pesquisa com filtro em tempo real nos checkboxes.
+Ajustes v2.2:
+  - Layout paisagem (A4 landscape) para caber colunas de descricao completas
+  - Coluna Nome (titular/dependente) expandida: sem truncamento
+  - Numero do mapa exibido no bloco Dados do Prestador
+  - Valor total visivel no bloco do prestador (resumo rapido)
+  - Nomes longos: multi_cell com quebra de linha automatica
+  - _latin1() cobre todos os textos passados ao fpdf
+  - Barra de pesquisa com filtro em tempo real
 """
 
 import os
@@ -25,21 +26,29 @@ from fpdf import FPDF
 # ──────────────────────────────────────────────
 BTN_FG            = "#0B8052"
 BTN_HOVER         = "#0E9E66"
-TEXT_COLOR_GRAY   = "#A0A0A0"
+TEXT_COLOR_GRAY   = "#94A3B8"
 SIDEBAR_BTN_FG    = "#134E8B"
 SIDEBAR_BTN_HOVER = "#1D67B5"
+ACCENT            = "#0E9E66"
 
 _RE_SAFE = re.compile(r"[^\w\-]")
 
+# Largura util do A4 paisagem = 297 mm, margens 10mm cada = 277mm util
+# Colunas:  Fatura Guia  Enc.Titular   Enc.Dependente  Valor
+# mm:         22   18      100            100            37   = 277
+COL_FATURA  = 22
+COL_GUIA    = 18
+COL_TITULAR = 100
+COL_DEP     = 100
+COL_VALOR   = 37
+TOTAL_COLS  = COL_FATURA + COL_GUIA + COL_TITULAR + COL_DEP + COL_VALOR  # 277
+
 
 # ──────────────────────────────────────────────
-#  Utilitários
+#  Utilitarios
 # ──────────────────────────────────────────────
 def _latin1(texto, maxlen=0):
-    """
-    Converte qualquer valor para string Latin-1 seguro para fpdf 1.x.
-    Caracteres fora do range (travessao u2014, emojis, etc.) viram '?'.
-    """
+    """Converte para Latin-1 seguro para fpdf 1.x. Chars fora do range viram '?'."""
     s = str(texto) if not isinstance(texto, str) else texto
     if maxlen:
         s = s[:maxlen]
@@ -47,7 +56,6 @@ def _latin1(texto, maxlen=0):
 
 
 def _formatar_id(val):
-    """Formata CPF (<=11 digitos) ou CNPJ (14 digitos) com pontuacao."""
     try:
         digits = str(int(float(str(val).strip())))
         if len(digits) <= 11:
@@ -66,89 +74,160 @@ def _fmt_valor(x):
         return str(x)
 
 
+def _nome_mapa(caminho_mapa):
+    """Extrai nome legivel do arquivo mapa."""
+    if not caminho_mapa:
+        return "Nao informado"
+    return _latin1(os.path.splitext(os.path.basename(caminho_mapa))[0])
+
+
 # ──────────────────────────────────────────────
-#  Classe PDF
+#  Classe PDF — A4 Paisagem
 # ──────────────────────────────────────────────
 class _PDFPrestador(FPDF):
-    """PDF de relatorio individual por CNPJ/CPF + Plano Interno."""
+    """PDF de relatorio individual — A4 Paisagem para caber descricoes longas."""
 
-    def __init__(self, nome, identificador, plano):
-        super().__init__()
-        # Todos os atributos ja passam por _latin1 aqui,
-        # eliminando o erro de encoding em qualquer metodo posterior.
-        self._nome  = _latin1(nome, 80)
-        self._id    = _latin1(identificador)
-        self._plano = _latin1(plano)
-        self._data  = datetime.now().strftime("%d/%m/%Y")
+    def __init__(self, nome, identificador, plano, mapa_nome, total_valor):
+        # orientation="L" = Landscape (paisagem)
+        super().__init__(orientation="L", unit="mm", format="A4")
+        self.set_margins(10, 10, 10)
+        self.set_auto_page_break(auto=True, margin=14)
 
+        self._nome       = _latin1(nome)        # sem truncamento
+        self._id         = _latin1(identificador)
+        self._plano      = _latin1(plano)
+        self._mapa       = _latin1(mapa_nome)
+        self._total      = _fmt_valor(total_valor)
+        self._data       = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    # ── Cabecalho de pagina ──────────────────
     def header(self):
+        # Faixa azul escura
         self.set_fill_color(15, 23, 42)
-        self.rect(0, 0, 210, 28, "F")
-        self.set_font("Arial", "B", 13)
+        self.rect(0, 0, 297, 22, "F")
+
+        self.set_font("Arial", "B", 12)
         self.set_text_color(255, 255, 255)
-        self.set_xy(8, 5)
-        self.cell(0, 8, "COPESP - Relatorio de Faturamento ao Prestador", ln=True)
+        self.set_xy(10, 4)
+        self.cell(200, 7, "COPESP - Relatorio de Faturamento ao Prestador", ln=False)
+
+        # Data alinhada a direita
         self.set_font("Arial", "", 9)
-        self.set_xy(8, 14)
-        self.cell(0, 6, f"Emissao: {self._data}", ln=True)
-        self.set_text_color(0, 0, 0)
-        self.ln(5)
+        self.set_xy(220, 4)
+        self.cell(67, 7, f"Emissao: {self._data}", align="R", ln=True)
 
-    def footer(self):
-        self.set_y(-12)
-        self.set_font("Arial", "I", 7)
-        self.set_text_color(120, 120, 120)
-        self.cell(
-            0, 8,
-            f"Pagina {self.page_no()} - Gerado automaticamente por Note Maps v2.0",
-            align="C"
-        )
-        self.set_text_color(0, 0, 0)
+        # Nome do prestador como subtitulo no cabecalho
+        self.set_xy(10, 13)
+        self.set_font("Arial", "I", 8)
+        self.set_text_color(180, 210, 255)
+        self.cell(0, 6, f"Prestador: {self._nome}  |  {self._id}  |  PI: {self._plano}", ln=True)
 
-    def bloco_prestador(self):
-        self.set_fill_color(240, 245, 255)
-        self.set_font("Arial", "B", 10)
-        self.cell(0, 7, "Dados do Prestador", border="B", ln=True, fill=True)
-        self.ln(2)
-        pares = [
-            ("Nome/Razao:",     self._nome),
-            ("CNPJ/CPF:",       self._id),
-            ("Plano Interno:",  self._plano),
-        ]
-        for label, valor in pares:
-            self.set_font("Arial", "", 10)
-            self.cell(38, 6, _latin1(label), border=0)
-            self.set_font("Arial", "B", 10)
-            self.cell(0, 6, _latin1(valor), border=0, ln=True)
+        self.set_text_color(0, 0, 0)
         self.ln(4)
 
-    def tabela_faturas(self, linhas):
-        cols = [
-            ("Fatura",          25),
-            ("Guia",            20),
-            ("Enc. Titular",    55),
-            ("Enc. Dependente", 55),
-            ("Valor (R$)",      35),
-        ]
-        # Cabecalho verde
-        self.set_fill_color(11, 128, 82)
-        self.set_text_color(255, 255, 255)
-        self.set_font("Arial", "B", 9)
-        for label, w in cols:
-            self.cell(w, 8, _latin1(label), border=1, align="C", fill=True)
-        self.ln()
+    # ── Rodape ──────────────────────────────
+    def footer(self):
+        self.set_y(-10)
+        self.set_font("Arial", "I", 7)
+        self.set_text_color(140, 140, 140)
+        self.cell(0, 6, f"Pagina {self.page_no()} - Gerado por Note Maps v2.0", align="C")
         self.set_text_color(0, 0, 0)
 
+    # ── Bloco de dados do prestador ─────────
+    def bloco_prestador(self):
+        # Fundo suave
+        self.set_fill_color(236, 244, 255)
+        self.rect(10, self.get_y(), TOTAL_COLS, 28, "F")
+
+        y0 = self.get_y() + 2
+
+        # Coluna esquerda: identificacao
+        self.set_xy(12, y0)
+        self.set_font("Arial", "B", 9)
+        self.set_text_color(60, 80, 120)
+        self.cell(40, 5, "DADOS DO PRESTADOR", ln=True)
+
+        dados_esq = [
+            ("Nome / Razao Social:", self._nome),
+            ("CNPJ / CPF:",          self._id),
+            ("Plano Interno (PI):",   self._plano),
+        ]
+        for label, valor in dados_esq:
+            self.set_xy(12, self.get_y())
+            self.set_font("Arial", "", 8)
+            self.set_text_color(100, 100, 100)
+            self.cell(42, 5, _latin1(label), border=0)
+            self.set_font("Arial", "B", 8)
+            self.set_text_color(20, 20, 20)
+            # multi_cell para nomes longos nao quebrarem layout
+            x_val = self.get_x()
+            self.set_xy(x_val, self.get_y())
+            self.cell(135, 5, _latin1(valor)[:90], border=0, ln=True)
+
+        # Coluna direita: resumo financeiro e mapa
+        self.set_xy(200, y0)
+        self.set_font("Arial", "B", 9)
+        self.set_text_color(60, 80, 120)
+        self.cell(0, 5, "RESUMO", ln=True)
+
+        resumo = [
+            ("Mapa de origem:", self._mapa),
+            ("Total do relatorio:", self._total),
+        ]
+        for label, valor in resumo:
+            self.set_xy(200, self.get_y())
+            self.set_font("Arial", "", 8)
+            self.set_text_color(100, 100, 100)
+            self.cell(38, 5, _latin1(label), border=0)
+            self.set_font("Arial", "B", 8)
+            self.set_text_color(11, 128, 82)
+            self.cell(0, 5, _latin1(valor), border=0, ln=True)
+
+        self.set_text_color(0, 0, 0)
+        self.ln(4)
+
+    # ── Tabela de faturas ───────────────────
+    def tabela_faturas(self, linhas):
+        """
+        Renderiza tabela com colunas ajustadas para nomes completos.
+        Usa multi_cell para titular/dependente longos sem cortar.
+        Retorna o total calculado.
+        """
+        cols = [
+            ("Fatura",         COL_FATURA,  "C"),
+            ("Guia",           COL_GUIA,    "C"),
+            ("Enc. Titular",   COL_TITULAR, "L"),
+            ("Enc. Dependente",COL_DEP,     "L"),
+            ("Valor (R$)",     COL_VALOR,   "R"),
+        ]
+        ROW_H = 7   # altura padrao de linha
+        HEADER_H = 8
+
+        def _cabecalho_tabela():
+            self.set_fill_color(11, 128, 82)
+            self.set_text_color(255, 255, 255)
+            self.set_font("Arial", "B", 8)
+            for label, w, aln in cols:
+                self.cell(w, HEADER_H, _latin1(label), border=1, align="C", fill=True)
+            self.ln()
+            self.set_text_color(0, 0, 0)
+
+        _cabecalho_tabela()
+
         total = 0.0
-        self.set_font("Arial", "", 8)
+        self.set_font("Arial", "", 7)
+
         for i, row in enumerate(linhas):
             fill = (i % 2 == 0)
-            self.set_fill_color(245, 248, 255) if fill else self.set_fill_color(255, 255, 255)
+            if fill:
+                self.set_fill_color(245, 249, 255)
+            else:
+                self.set_fill_color(255, 255, 255)
 
-            fatura  = _latin1(row.get("Fatura", ""), 20)
-            guia    = _latin1(row.get("Guia", ""), 20)
-            enc_tit = _latin1(row.get("enc titular", ""), 50)
-            enc_dep = _latin1(row.get("enc dependente", ""), 50)
+            fatura  = _latin1(row.get("Fatura", ""))
+            guia    = _latin1(row.get("Guia", ""))
+            tit     = _latin1(row.get("enc titular", ""))    # sem truncamento
+            dep     = _latin1(row.get("enc dependente", "")) # sem truncamento
 
             valor_raw = row.get("Valor", 0)
             try:
@@ -157,19 +236,53 @@ class _PDFPrestador(FPDF):
                 valor_num = 0.0
             total += valor_num
 
-            self.cell(25, 7, fatura,              border=1, fill=fill)
-            self.cell(20, 7, guia,                border=1, fill=fill)
-            self.cell(55, 7, enc_tit,             border=1, fill=fill)
-            self.cell(55, 7, enc_dep,             border=1, fill=fill)
-            self.cell(35, 7, _fmt_valor(valor_num), border=1, align="R", fill=fill)
-            self.ln()
+            # Calcula altura necessaria para tit e dep (quebras de linha)
+            # fpdf nao tem get_string_width para multi_cell diretamente,
+            # usamos estimativa: 1 linha extra a cada ~80 chars nos campos largos
+            linhas_tit = max(1, len(tit) // 60 + 1)
+            linhas_dep = max(1, len(dep) // 60 + 1)
+            h = max(linhas_tit, linhas_dep) * ROW_H
 
-        # Total
-        self.set_font("Arial", "B", 9)
-        self.set_fill_color(230, 240, 230)
-        self.cell(155, 8, "TOTAL", border=1, align="C", fill=True)
-        self.cell(35,  8, _fmt_valor(total), border=1, align="R", fill=True)
-        self.ln(6)
+            # Verifica quebra de pagina manual
+            if self.get_y() + h > self.page_break_trigger:
+                self.add_page()
+                _cabecalho_tabela()
+
+            x0 = self.get_x()
+            y0 = self.get_y()
+
+            # Celulas simples (fatura, guia, valor) com altura h para alinhar
+            self.set_xy(x0, y0)
+            self.cell(COL_FATURA, h, fatura,              border=1, align="C", fill=fill)
+            self.cell(COL_GUIA,   h, guia,                border=1, align="C", fill=fill)
+
+            # Titular — multi_cell com quebra automatica
+            x_tit = self.get_x()
+            self.set_xy(x_tit, y0)
+            self.set_fill_color(245, 249, 255) if fill else self.set_fill_color(255, 255, 255)
+            self.multi_cell(COL_TITULAR, ROW_H, tit, border=1, align="L", fill=fill)
+
+            # Dependente
+            x_dep = x_tit + COL_TITULAR
+            self.set_xy(x_dep, y0)
+            self.multi_cell(COL_DEP, ROW_H, dep, border=1, align="L", fill=fill)
+
+            # Valor — alinhado ao centro vertical da linha
+            self.set_xy(x_dep + COL_DEP, y0)
+            self.cell(COL_VALOR, h, _fmt_valor(valor_num), border=1, align="R", fill=fill)
+
+            self.set_xy(x0, y0 + h)
+
+        # Linha de total
+        self.set_font("Arial", "B", 8)
+        self.set_fill_color(11, 100, 60)
+        self.set_text_color(255, 255, 255)
+        largura_ate_valor = COL_FATURA + COL_GUIA + COL_TITULAR + COL_DEP
+        self.cell(largura_ate_valor, 8, "TOTAL GERAL", border=1, align="C", fill=True)
+        self.cell(COL_VALOR, 8, _fmt_valor(total), border=1, align="R", fill=True)
+        self.ln(8)
+        self.set_text_color(0, 0, 0)
+
         return total
 
 
@@ -180,85 +293,88 @@ class RelatorioCNPJFrame(ctk.CTkFrame):
     """Aba 'Relatorio por CNPJ/PI'."""
 
     def __init__(self, master, app=None):
-        super().__init__(master)
+        super().__init__(master, fg_color="transparent")
         self.app = app
         self.df = None
-        self.grupos = []
+        self.grupos = []    # [(nome, id_fmt, plano, df_grupo, id_val)]
         self.checkboxes = []
         self._build_ui()
         if self.app and self.app.arquivo_mapa:
             self.after(300, self._carregar)
 
     def _build_ui(self):
+        # Titulo
         ctk.CTkLabel(
             self, text="Relatorio por CNPJ / Plano Interno",
-            font=("Segoe UI", 28, "bold")
-        ).pack(pady=(30, 6))
+            font=("Segoe UI", 24, "bold"),
+            text_color="#F1F5F9"
+        ).pack(pady=(28, 4))
 
         ctk.CTkLabel(
             self,
-            text=(
-                "Selecione os prestadores para os quais deseja gerar um PDF "
-                "individual pronto para envio por e-mail."
-            ),
-            font=("Segoe UI", 14), wraplength=640,
-            justify="center", text_color=TEXT_COLOR_GRAY
-        ).pack(pady=(0, 8))
+            text="Selecione os prestadores para gerar um PDF individual pronto para envio por e-mail.",
+            font=("Segoe UI", 13),
+            wraplength=640, justify="center",
+            text_color=TEXT_COLOR_GRAY
+        ).pack(pady=(0, 6))
 
-        ctk.CTkFrame(self, height=2, fg_color="gray").pack(fill="x", padx=30, pady=(0, 10))
+        ctk.CTkFrame(self, height=1, fg_color="#2d4060").pack(fill="x", padx=30, pady=(0, 10))
 
         # ── Barra de pesquisa ──
         busca_frame = ctk.CTkFrame(self, fg_color="transparent")
         busca_frame.pack(fill="x", padx=30, pady=(0, 6))
 
-        ctk.CTkLabel(busca_frame, text="🔍", font=("Segoe UI", 18)).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(
+            busca_frame, text="Pesquisar",
+            font=("Segoe UI", 12), text_color=TEXT_COLOR_GRAY
+        ).pack(side="left", padx=(0, 8))
 
         self.entry_busca = ctk.CTkEntry(
             busca_frame,
-            placeholder_text="Pesquisar por nome, CNPJ/CPF ou Plano Interno...",
+            placeholder_text="Nome, CNPJ/CPF ou Plano Interno...",
             font=("Segoe UI", 13),
-            height=34,
+            height=32,
         )
         self.entry_busca.pack(side="left", fill="x", expand=True)
         self.entry_busca.bind("<KeyRelease>", lambda _e: self._filtrar_checkboxes())
 
         ctk.CTkButton(
-            busca_frame, text="x", width=34, height=34,
-            fg_color="#3a3a3a", hover_color="#555",
-            font=("Segoe UI", 13, "bold"),
+            busca_frame, text="Limpar", width=64, height=32,
+            fg_color="#1E3050", hover_color="#2d4060",
+            font=("Segoe UI", 12),
             command=self._limpar_busca
-        ).pack(side="left", padx=(4, 0))
+        ).pack(side="left", padx=(6, 0))
 
-        # ── Area de selecao ──
-        sel_frame = ctk.CTkFrame(self, fg_color="#2b2b2b")
-        sel_frame.pack(pady=4, padx=20, fill="x")
+        # ── Area principal: lista + controles ──
+        area = ctk.CTkFrame(self, fg_color="#111d2e", corner_radius=10)
+        area.pack(pady=4, padx=20, fill="both", expand=True)
 
-        self.scroll_check = ctk.CTkScrollableFrame(sel_frame, height=240, width=520)
-        self.scroll_check.pack(side="left", padx=(10, 5), pady=8)
+        self.scroll_check = ctk.CTkScrollableFrame(area, fg_color="transparent")
+        self.scroll_check.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=8)
 
-        side_ctrl = ctk.CTkFrame(sel_frame, fg_color="transparent")
-        side_ctrl.pack(side="left", padx=5, pady=8, fill="y")
+        # Painel direito de controles
+        ctrl = ctk.CTkFrame(area, fg_color="transparent", width=170)
+        ctrl.pack(side="right", padx=12, pady=12, fill="y")
+        ctrl.pack_propagate(False)
 
-        ctk.CTkButton(
-            side_ctrl, text="Selecionar tudo",
-            command=self._selecionar_visiveis,
-            fg_color=SIDEBAR_BTN_FG, hover_color=SIDEBAR_BTN_HOVER,
-            font=("Segoe UI", 13), width=155, height=32, corner_radius=6
-        ).pack(pady=3)
+        for texto, cmd in [
+            ("Selecionar todos", self._selecionar_visiveis),
+            ("Limpar selecao",   self._limpar_selecao),
+        ]:
+            ctk.CTkButton(
+                ctrl, text=texto, command=cmd,
+                fg_color=SIDEBAR_BTN_FG, hover_color=SIDEBAR_BTN_HOVER,
+                font=("Segoe UI", 12), height=32, corner_radius=6
+            ).pack(fill="x", pady=3)
 
-        ctk.CTkButton(
-            side_ctrl, text="Limpar selecao",
-            command=self._limpar_selecao,
-            fg_color=SIDEBAR_BTN_FG, hover_color=SIDEBAR_BTN_HOVER,
-            font=("Segoe UI", 13), width=155, height=32, corner_radius=6
-        ).pack(pady=3)
+        ctk.CTkFrame(ctrl, height=1, fg_color="#2d4060").pack(fill="x", pady=8)
 
         self.lbl_contagem = ctk.CTkLabel(
-            side_ctrl, text="",
+            ctrl, text="0 prestadores",
             font=("Segoe UI", 11), text_color=TEXT_COLOR_GRAY,
-            wraplength=155, justify="center"
+            wraplength=160, justify="center"
         )
-        self.lbl_contagem.pack(pady=(10, 0))
+        self.lbl_contagem.pack()
 
         # ── Botao gerar ──
         self.btn_gerar = ctk.CTkButton(
@@ -266,10 +382,10 @@ class RelatorioCNPJFrame(ctk.CTkFrame):
             command=self._gerar_pdfs,
             state="disabled",
             fg_color=BTN_FG, hover_color=BTN_HOVER,
-            font=("Segoe UI", 18, "bold"),
-            width=220, height=55, corner_radius=12
+            font=("Segoe UI", 15, "bold"),
+            width=200, height=46, corner_radius=8
         )
-        self.btn_gerar.pack(pady=14)
+        self.btn_gerar.pack(pady=12)
 
         self.progress = ctk.CTkProgressBar(self, mode="indeterminate")
         self.progress.pack(fill="x", padx=30)
@@ -277,9 +393,9 @@ class RelatorioCNPJFrame(ctk.CTkFrame):
 
         self.status = ctk.CTkLabel(
             self, text="Aguardando arquivo mapa...",
-            font=("Calibri", 14, "bold"), text_color="#1e7bc5"
+            font=("Segoe UI", 12), text_color="#60A5FA"
         )
-        self.status.pack(pady=10)
+        self.status.pack(pady=8)
 
     # ── Callbacks do App ──────────────────
     def atualizar_arquivo_mapa(self, caminho):
@@ -330,8 +446,8 @@ class RelatorioCNPJFrame(ctk.CTkFrame):
         self._reconstruir_checkboxes()
         self.btn_gerar.configure(state="normal")
         self.status.configure(
-            text=f"{len(self.grupos)} grupo(s) carregado(s): {os.path.basename(caminho)}",
-            text_color="green"
+            text=f"{len(self.grupos)} grupo(s) carregado(s) — {os.path.basename(caminho)}",
+            text_color=ACCENT
         )
 
     def _reconstruir_checkboxes(self):
@@ -345,15 +461,21 @@ class RelatorioCNPJFrame(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self.scroll_check,
-            text="Prestador - Plano Interno",
-            font=("Segoe UI", 13, "bold")
+            text="Prestador  —  Plano Interno",
+            font=("Segoe UI", 12, "bold"),
+            text_color="#60A5FA"
         ).pack(anchor="w", pady=(0, 6))
 
         for item in self.grupos:
             nome, id_fmt, plano, _, _ = item
-            texto = f"{nome[:38]}  |  {id_fmt}  |  PI: {plano}"
-            cb = ctk.CTkCheckBox(self.scroll_check, text=texto)
-            cb.pack(anchor="w", pady=1)
+            texto = f"{nome[:40]}   {id_fmt}   PI: {plano}"
+            cb = ctk.CTkCheckBox(
+                self.scroll_check, text=texto,
+                font=("Segoe UI", 12),
+                checkmark_color="#ffffff",
+                fg_color=BTN_FG, hover_color=BTN_HOVER
+            )
+            cb.pack(anchor="w", pady=2)
             if (nome, id_fmt, plano) in marcados:
                 cb.select()
             self.checkboxes.append((item, cb))
@@ -372,7 +494,7 @@ class RelatorioCNPJFrame(ctk.CTkFrame):
                 or termo in plano.lower()
             )
             if visivel:
-                cb.pack(anchor="w", pady=1)
+                cb.pack(anchor="w", pady=2)
             else:
                 cb.pack_forget()
         self._atualizar_contagem()
@@ -384,7 +506,7 @@ class RelatorioCNPJFrame(ctk.CTkFrame):
     def _atualizar_contagem(self):
         visiveis = sum(1 for _, cb in self.checkboxes if cb.winfo_ismapped())
         total    = len(self.checkboxes)
-        self.lbl_contagem.configure(text=f"{visiveis} de {total} prestadores")
+        self.lbl_contagem.configure(text=f"{visiveis} de {total}\nprestadores")
 
     # ── Selecao ───────────────────────────
     def _selecionar_visiveis(self):
@@ -396,7 +518,7 @@ class RelatorioCNPJFrame(ctk.CTkFrame):
         for _, cb in self.checkboxes:
             cb.deselect()
 
-    # ── Geracao de PDFs ───────────────────
+    # ── Geracao ───────────────────────────
     def _gerar_pdfs(self):
         selecionados = [(item, cb) for item, cb in self.checkboxes if cb.get()]
         if not selecionados:
@@ -412,15 +534,19 @@ class RelatorioCNPJFrame(ctk.CTkFrame):
         self.btn_gerar.configure(state="disabled")
         self.progress.pack(fill="x", padx=30, pady=4)
         self.progress.start()
-        self.status.configure(text="Gerando PDF(s)...", text_color="#1E3A8A")
+        self.status.configure(text="Gerando PDF(s)...", text_color="#60A5FA")
         self.update()
 
         gerados, erros = [], []
-        pasta_real = os.path.realpath(pasta)
+        pasta_real  = os.path.realpath(pasta)
+        mapa_nome   = _nome_mapa(self.app.arquivo_mapa if self.app else None)
 
         for (nome, id_fmt, plano, grupo, _), _ in selecionados:
             try:
-                pdf = _PDFPrestador(nome, id_fmt, plano)
+                # Calcula total para passar ao bloco do prestador
+                total_val = pd.to_numeric(grupo["Valor"], errors="coerce").sum()
+
+                pdf = _PDFPrestador(nome, id_fmt, plano, mapa_nome, total_val)
                 pdf.add_page()
                 pdf.bloco_prestador()
                 pdf.tabela_faturas(grupo.to_dict("records"))
@@ -448,15 +574,13 @@ class RelatorioCNPJFrame(ctk.CTkFrame):
         resumo = f"{len(gerados)} PDF(s) gerado(s)."
         if erros:
             resumo += f"  {len(erros)} erro(s)."
-            messagebox.showwarning("Erros na geracao", "\n".join(erros))
+            messagebox.showwarning("Erros", "\n".join(erros))
         self.status.configure(
             text=resumo,
-            text_color="green" if not erros else "orange"
+            text_color=ACCENT if not erros else "orange"
         )
 
 
-# ──────────────────────────────────────────────
-#  Validacao de pasta
 # ──────────────────────────────────────────────
 def _validar_pasta(path):
     if not path:
