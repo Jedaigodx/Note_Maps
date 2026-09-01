@@ -54,6 +54,22 @@ def _nome_mapa(caminho_mapa):
     if not caminho_mapa: return "Nao informado"
     return _latin1(os.path.splitext(os.path.basename(caminho_mapa))[0])
 
+def _linhas_multicell(pdf, texto, largura, padding=2):
+    """Calcula quantas linhas o multi_cell vai realmente desenhar, usando a largura
+    real dos caracteres na fonte atual do pdf, em vez de uma estimativa fixa por
+    número de caracteres (que pode subestimar a altura necessária da linha)."""
+    largura_util = max(largura - padding, 1)
+    linhas = 1
+    linha_atual = ""
+    for palavra in str(texto).split(" "):
+        candidato = f"{linha_atual} {palavra}".strip()
+        if pdf.get_string_width(candidato) <= largura_util:
+            linha_atual = candidato
+        else:
+            linhas += 1
+            linha_atual = palavra
+    return max(1, linhas)
+
 
 class _PDFPrestador(FPDF):
     def __init__(self, nome, identificador, plano, mapa_nome, total_valor):
@@ -167,13 +183,19 @@ class _PDFPrestador(FPDF):
             except: valor_num = 0.0
             total += valor_num
 
-            linhas_tit = max(1, len(tit) // 60 + 1)
-            linhas_dep = max(1, len(dep) // 60 + 1)
+            linhas_tit = _linhas_multicell(self, tit, COL_TITULAR)
+            linhas_dep = _linhas_multicell(self, dep, COL_DEP)
             h = max(linhas_tit, linhas_dep) * ROW_H
 
             if self.get_y() + h > self.page_break_trigger:
                 self.add_page()
                 _cabecalho_tabela()
+                # BUGFIX: _cabecalho_tabela() deixa a fonte em Arial Bold 8 (usada no
+                # cabeçalho). Sem este reset, as linhas de dados da página seguinte
+                # eram desenhadas em negrito, ficando maiores que o esperado e
+                # podendo estourar a altura calculada da linha / quebrar texto de
+                # forma inesperada — mesmo defeito relatado no Relatório Detalhado.
+                self.set_font("Arial", "", 7)
 
             x0 = self.get_x()
             y0 = self.get_y()

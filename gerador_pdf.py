@@ -20,13 +20,43 @@ def _latin1(texto):
     s = str(texto)
     return s.encode("latin-1", errors="replace").decode("latin-1")
 
+def _linhas_multicell(pdf, texto, largura, padding=2):
+    """Calcula quantas linhas o multi_cell vai realmente desenhar, usando a largura
+    real dos caracteres na fonte atualmente selecionada no pdf (em vez de uma
+    estimativa fixa de 'caracteres por mm'). Isso evita que a altura da linha seja
+    subestimada e o texto seja cortado/quebrado de forma inesperada."""
+    largura_util = max(largura - padding, 1)
+    linhas = 1
+    linha_atual = ""
+    for palavra in str(texto).split(" "):
+        candidato = f"{linha_atual} {palavra}".strip()
+        if pdf.get_string_width(candidato) <= largura_util:
+            linha_atual = candidato
+        else:
+            linhas += 1
+            linha_atual = palavra
+    return max(1, linhas)
+
+def _truncar_para_largura(pdf, texto, largura, padding=2):
+    """Trunca um texto de coluna que não deve quebrar linha (ex: código, CNPJ),
+    adicionando reticências, em vez de deixá-lo sobrepor a célula vizinha ou ser
+    dividido no meio por um multi_cell."""
+    texto = str(texto)
+    largura_util = max(largura - padding, 1)
+    if pdf.get_string_width(texto) <= largura_util:
+        return texto
+    base = texto
+    while base and pdf.get_string_width(base + "...") > largura_util:
+        base = base[:-1]
+    return f"{base}..." if base else texto[:1]
+
 COLUNAS_PDF = ["CNPJ", "CPF", "Guia", "Fatura", "Plano Interno",
                "enc titular", "enc dependente", "Valor"]
 
 # Larguras em mm ajustadas para o formato paisagem (~277mm de área útil)
 LARGURAS = {
-    "CNPJ": 25, "CPF": 25, "Guia": 15, "Fatura": 15, "Plano Interno": 25,
-    "enc titular": 80, "enc dependente": 80, "Valor": 25
+    "CNPJ": 25, "CPF": 25, "Guia": 15, "Fatura": 15, "Plano Interno": 32,
+    "enc titular": 77, "enc dependente": 77, "Valor": 25
 }
 
 class _PDFTabela(FPDF):
@@ -63,6 +93,11 @@ class _PDFTabela(FPDF):
         self.set_font("Arial", "", 7)
         ROW_H = 6
 
+        # Apenas colunas de texto livre (nomes) podem quebrar em mais de uma linha.
+        # Códigos e identificadores (CNPJ/CPF, Guia, Fatura, Plano Interno) nunca
+        # devem ser divididos no meio por um multi_cell.
+        COLUNAS_WRAP = {"enc titular", "enc dependente"}
+
         for _, row in dados.iterrows():
             # Coleta os textos para descobrir a altura máxima da linha
             textos = {}
@@ -77,21 +112,30 @@ class _PDFTabela(FPDF):
                 else:
                     texto = str(val) if pd.notnull(val) else ""
                     if texto.strip().lower() in ["nan", "none"]: texto = "-"
-                
+
                 texto = _latin1(texto)
                 textos[col] = texto
-                
-                # Estimativa de quebra de linha com base na largura da coluna (fator de correção aprox)
-                largura_mm = larguras_usadas[col]
-                chars_por_linha = largura_mm / 1.5 
-                linhas_necessarias = max(1, len(texto) // int(chars_por_linha) + 1)
+
+                if col in COLUNAS_WRAP:
+                    # Quantidade real de linhas que o multi_cell vai desenhar nesta
+                    # fonte/largura (medida com get_string_width, não estimada)
+                    linhas_necessarias = _linhas_multicell(self, texto, larguras_usadas[col])
+                else:
+                    linhas_necessarias = 1
                 if linhas_necessarias > max_linhas:
                     max_linhas = linhas_necessarias
-            
+
             h = max_linhas * ROW_H
             if self.get_y() + h > self.page_break_trigger:
                 self.add_page()
                 desenhar_cabecalho()
+                # BUGFIX: desenhar_cabecalho() deixa a fonte em Arial Bold 9 (usada no
+                # cabeçalho da tabela). Sem este reset, todas as linhas de dados da
+                # página seguinte eram desenhadas em negrito/tamanho maior, o que
+                # fazia textos como "D8SAFUSCONS" não caberem mais na coluna e serem
+                # quebrados no meio (ex.: "D8SAFUSCON" / "S") — este era o defeito
+                # relatado, visível a partir da 2ª página do relatório.
+                self.set_font("Arial", "", 7)
 
             x0 = self.get_x()
             y0 = self.get_y()
@@ -100,16 +144,20 @@ class _PDFTabela(FPDF):
                 w = larguras_usadas[col]
                 texto = textos[col]
                 x_atual = self.get_x()
-                
-                if col in ["enc titular", "enc dependente", "Plano Interno"]:
+
+                if col in COLUNAS_WRAP:
                     self.set_xy(x_atual, y0)
                     self.multi_cell(w, ROW_H, texto, border=1, align="L")
                 else:
                     self.set_xy(x_atual, y0)
                     alinhamento = "R" if col == "Valor" else "C"
-                    self.cell(w, h, texto, border=1, align=alinhamento)
+                    # Colunas de código/valor nunca quebram: se não couberem na
+                    # largura da coluna, são truncadas com reticências em vez de
+                    # sobrepor a célula vizinha.
+                    texto_exibido = texto if col == "Valor" else _truncar_para_largura(self, texto, w)
+                    self.cell(w, h, texto_exibido, border=1, align=alinhamento)
                 self.set_xy(x_atual + w, y0)
-            
+
             self.set_xy(x0, y0 + h)
 
         try:
