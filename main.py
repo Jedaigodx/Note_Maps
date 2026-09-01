@@ -171,7 +171,7 @@ class App(ctk.CTk):
         if os.path.isfile(ico):
             self.iconbitmap(ico)
 
-        self.title("Note Maps v2.0 - COPESP")
+        self.title("Note Maps v2.1 - COPESP")
         self.geometry("970x700")
         self.minsize(950, 650)
         self.configure(bg=SIDEBAR_BG)
@@ -201,7 +201,7 @@ class App(ctk.CTk):
         logo_frame.pack(fill="x", padx=16, pady=(28, 6))
 
         ctk.CTkLabel(logo_frame, text="Note Maps", font=("Segoe UI", 20, "bold"), text_color=HEADER_COLOR).pack(anchor="w")
-        ctk.CTkLabel(logo_frame, text="v2.0", font=("Segoe UI", 11), text_color=ACCENT).pack(anchor="w")
+        ctk.CTkLabel(logo_frame, text="v2.1", font=("Segoe UI", 11), text_color=ACCENT).pack(anchor="w")
         ctk.CTkFrame(self.sidebar, height=1, fg_color="#333333").pack(fill="x", padx=16, pady=(8, 16))
 
         menu_items = [
